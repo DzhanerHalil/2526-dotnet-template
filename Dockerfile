@@ -11,8 +11,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 COPY . .
-RUN dotnet restore Rise.Server/Rise.Server.csproj
-RUN dotnet publish Rise.Server/Rise.Server.csproj \
+RUN dotnet restore src/Rise.Server/Rise.Server.csproj
+RUN dotnet publish src/Rise.Server/Rise.Server.csproj \
     --configuration Release \
     --output /app/publish \
     --no-restore
