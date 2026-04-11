@@ -32,7 +32,6 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Building RISE application...'
-                sh 'dotnet workload install wasm-tools'
                 sh 'dotnet build --configuration Release'
             }
         }
