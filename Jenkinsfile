@@ -16,7 +16,7 @@ pipeline {
 
     environment {
         DOTNET_CLI_TELEMETRY_OPTOUT = '1'
-        DOCKER_IMAGE = "ghcr.io/DzhanerHalil/rise-app"
+        DOCKER_IMAGE = "ghcr.io/dzhanerhalil/rise-app"
         GIT_SHA = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
         ANSIBLE_DIR = "/var/lib/jenkins/ansible"
     }
