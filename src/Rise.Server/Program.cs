@@ -9,6 +9,7 @@ using Rise.Server.Processors;
 using Rise.Services;
 using Rise.Services.Identity;
 using Serilog.Events;
+using Microsoft.AspNetCore.HttpOverrides;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
@@ -30,7 +31,7 @@ try
         {
             var connectionString = builder.Configuration.GetConnectionString("DatabaseConnection") ??
                                    throw new InvalidOperationException("Connection string 'DatabaseConnection' not found.");
-            o.UseSqlite(connectionString); // Swap Sqlite for your database provider (e.g. Sql Server, MySQL, PostgreSQL, etc.).
+            o.UseNpgsql(connectionString);
             o.EnableDetailedErrors();
             if (builder.Environment.IsDevelopment())
             {
@@ -72,18 +73,33 @@ try
     var app = builder.Build();
     // apply Database migraticons on startup, not so wise in production (Use Generated SQL Scripts) 
     // See: https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/applying?tabs=dotnet-core-cli
-    if (app.Environment.IsDevelopment())
+  
+  
+    // Migrations run in every environment: the container is deployed against a
+    // freshly provisioned, empty PostgreSQL database, so the schema must be
+    // created on startup. In a larger production setup you would generate SQL
+    // scripts and apply them as a separate, reviewable deployment step.
+    using (var scope = app.Services.CreateScope())
     {
-        using (var scope = app.Services.CreateScope())
-        {
-            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var dbSeeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
-            // dbContext.Database.EnsureDeleted(); // Delete the database if it exists to clean it up if needed.
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        dbContext.Database.Migrate();
 
-            dbContext.Database.Migrate(); // Creates the database if it doesn't exist and applies all migrations. See Readme.md for more info.
-            await dbSeeder.SeedAsync(); // Seeds the database with some test data.
+        // Seeding is opt-in via configuration so it never runs unintentionally.
+        if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("SeedDatabase"))
+        {
+            var dbSeeder = scope.ServiceProvider.GetRequiredService<DbSeeder>();
+            await dbSeeder.SeedAsync();
         }
     }
+
+    // Caddy terminates TLS and proxies plain HTTP to the container.
+    // Without this, the app cannot tell the original request was HTTPS.
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    });
+
+
     // Theses middlewares are strict in order of calling!
     app.UseHttpsRedirection()
         .UseBlazorFrameworkFiles() // Blazor is also served from the API. 
