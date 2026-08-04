@@ -82,6 +82,15 @@ pipeline {
                 """
             }
         }
+
+        stage('Deploy Cloud') {
+            steps {
+                sh """
+                    cd ${ANSIBLE_DIR}
+                    ansible-playbook -i inventory/cloud deploy.yml -e deploy_tag=${env.GIT_SHA}
+                """
+            }
+        }
     }
 
     post {
