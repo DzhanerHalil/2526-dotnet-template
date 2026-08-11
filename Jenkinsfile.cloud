@@ -11,7 +11,6 @@ pipeline {
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
-
     }
 
     stages {
@@ -19,20 +18,18 @@ pipeline {
             steps {
                 checkout scm
                 script {
-                    // Computed here, not in environment{}, because the
-                    // environment block is evaluated before the workspace exists.
                     env.GIT_SHA = sh(
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
                     ).trim()
                 }
-                echo "Building commit ${env.GIT_SHA}"
+                echo "Cloud-pijplijn voor commit ${env.GIT_SHA}"
             }
         }
 
         stage('Static Analysis') {
             steps {
-                sh 'dotnet format --verify-no-changes --verbosity diagnostic || true'
+                sh 'dotnet format --verify-no-changes --no-restore || echo "Formatting issues found (non-blocking)"'
             }
         }
 
@@ -76,24 +73,22 @@ pipeline {
             }
         }
 
-        stage('Deploy Local') {
+        stage('Deploy Cloud') {
             steps {
                 sh """
                     cd ${ANSIBLE_DIR}
-                    ansible-playbook -i inventory/local deploy.yml -e deploy_tag=${env.GIT_SHA}
+                    ansible-playbook -i inventory/cloud deploy.yml -e deploy_tag=${env.GIT_SHA}
                 """
             }
         }
-
-    
     }
 
     post {
         success {
-            echo "Deployed ${DOCKER_IMAGE}:${env.GIT_SHA} to https://192.168.56.20/"
+            echo "Deployed ${DOCKER_IMAGE}:${env.GIT_SHA} naar https://ep3-rise-dzhaner.francecentral.cloudapp.azure.com/"
         }
         failure {
-            echo 'Pipeline failed — check the stage logs above.'
+            echo "Cloud-pijplijn faalde — controleer of de Azure-VM's draaien."
         }
         cleanup {
             cleanWs()
